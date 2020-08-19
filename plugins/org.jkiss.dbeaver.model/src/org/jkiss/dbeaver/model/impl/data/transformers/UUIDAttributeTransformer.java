@@ -33,16 +33,36 @@ import org.jkiss.dbeaver.utils.GeneralUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Transforms binary attribute value into UUID.
  */
+/**
+ * And
+ * Transforms binary(16) attribute value into UUID.
+ * <p>
+ * This specific UUID storage format saves space and improves INSERT performance as described in the linked article.
+ * </p>
+ *
+ * @see <a href="https://www.percona.com/blog/2014/12/19/store-uuid-optimized-way/">Store UUID in an optimized way</a>
+ */
 public class UUIDAttributeTransformer implements DBDAttributeTransformer {
+    public static final String PROP_TYPE = "type";
+    public static final String PROP_STANDARD = "Standard";
+    public static final String PROP_ORDERED = "Ordered";
+    boolean isOrdered;
 
     @Override
     public void transformAttribute(@NotNull DBCSession session, @NotNull DBDAttributeBinding attribute, @NotNull List<Object[]> rows, @NotNull Map<String, Object> options) throws DBException {
-        attribute.setPresentationAttribute(
-            new TransformerPresentationAttribute(attribute, "UUID", -1, DBPDataKind.BINARY));
+        if (options.get(PROP_TYPE).equals(PROP_ORDERED)) {
+            attribute.setPresentationAttribute(
+                    new TransformerPresentationAttribute(attribute, "UUID (Ordered)", 16, DBPDataKind.BINARY));
+            isOrdered = true;
+        } else {
+            attribute.setPresentationAttribute(
+                    new TransformerPresentationAttribute(attribute, "UUID", -1, DBPDataKind.BINARY));
+        }
 
         attribute.setTransformHandler(new UUIDValueHandler(attribute.getValueHandler()));
     }
@@ -60,6 +80,26 @@ public class UUIDAttributeTransformer implements DBDAttributeTransformer {
                 bytes = (byte[]) value;
             } else if (value instanceof JDBCContentBytes) {
                 bytes = ((JDBCContentBytes) value).getRawValue();
+            }
+            if (isOrdered && bytes != null && bytes.length >= 16) {
+                // byte shift operations from Ebean ORM project pull request #1308
+                long mostSigBits = ((long)bytes[4] << 56) // XXXXXXXX-____-____-...
+                        + ((long)(bytes[5] & 255) << 48)
+                        + ((long)(bytes[6] & 255) << 40)
+                        + ((long)(bytes[7] & 255) << 32)
+                        + ((long)(bytes[2] & 255) << 24)      // ________-XXXX-____-...
+                        + ((bytes[3] & 255) << 16)
+                        + ((bytes[0] & 255) <<  8)            // ________-____-XXXX-...
+                        + ((bytes[1] & 255) <<  0);
+                long leastSigBits = ((long)bytes[8] << 56)// ________-____-____-XXXX-...
+                        + ((long)(bytes[9] & 255) << 48)
+                        + ((long)(bytes[10] & 255) << 40)     // ________-____-____-____-XXXXXXXXXXXX
+                        + ((long)(bytes[11] & 255) << 32)
+                        + ((long)(bytes[12] & 255) << 24)
+                        + ((bytes[13] & 255) << 16)
+                        + ((bytes[14] & 255) <<  8)
+                        + ((bytes[15] & 255) <<  0);
+                return new UUID(mostSigBits, leastSigBits).toString();
             }
             if (bytes != null) {
                 try {

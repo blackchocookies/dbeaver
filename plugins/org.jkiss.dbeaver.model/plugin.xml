@@ -209,8 +209,11 @@
                 custom="true">
             <type kind="BINARY"/>
             <type kind="CONTENT"/>
+            <propertyGroup label="Properties">
+                <property id="type" label="UUID type" type="string" description="UUID type" defaultValue="Standard" required="true" validValues="Standard,Ordered"/>
+            </propertyGroup>
         </transformer>
-        <transformer
+        <!--<transformer
                 class="org.jkiss.dbeaver.model.impl.data.transformers.UUIDOrderedAttributeTransformer"
                 id="org.jkiss.dbeaver.core.UUIDOrderedAttributeTransformer"
                 name="UUID (Ordered)"
@@ -219,7 +222,7 @@
                 custom="true">
             <type kind="BINARY"/>
             <type kind="CONTENT"/>
-        </transformer>
+        </transformer>-->
         <transformer
                 class="org.jkiss.dbeaver.model.impl.data.transformers.BinaryAttributeTransformer"
                 id="org.jkiss.dbeaver.core.BinaryAttributeTransformer"
